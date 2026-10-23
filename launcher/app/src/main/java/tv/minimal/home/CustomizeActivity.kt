@@ -11,6 +11,7 @@ import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ScrollView
 import android.widget.Toast
 
 /** Remote-friendly customization; also works when launched from the accessibility overlay. */
@@ -37,6 +38,10 @@ class CustomizeActivity : Activity() {
             setOnClickListener { reorderFavorites() }
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         column.addView(Button(this).apply {
+            setText(R.string.wallpaper_title)
+            setOnClickListener { startActivity(Intent(this@CustomizeActivity, WallpaperPickerActivity::class.java)) }
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        column.addView(Button(this).apply {
             text = "Home-Taste einrichten"
             setOnClickListener {
                 AlertDialog.Builder(this@CustomizeActivity)
@@ -59,7 +64,10 @@ class CustomizeActivity : Activity() {
             text = "Zurück zum Startbildschirm"
             setOnClickListener { finish() }
         })
-        setContentView(column)
+        setContentView(ScrollView(this).apply {
+            isFillViewport = true
+            addView(column, android.widget.FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        })
     }
 
     override fun onResume() {

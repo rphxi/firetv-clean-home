@@ -40,7 +40,7 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
     }
 
     private val pad = context.dpi(56)
-    private val dockPad = context.dpi(20)
+    private val dockPad = context.dpi(18)
     private val screenH = resources.displayMetrics.heightPixels
 
     private val dim: View
@@ -389,8 +389,8 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
         val contentW = resources.displayMetrics.widthPixels - 2 * pad
 
         dockRow.removeAllViews()
-        val dockGap = context.dpi(20)
-        val dockW = context.dpi(176)
+        val dockGap = context.dpi(16)
+        val dockW = context.dpi(148)
         catalog.favorites.forEachIndexed { i, app ->
             dockRow.addView(tile(app, cornerDp = 16f), LinearLayout.LayoutParams(dockW, dockW * 9 / 16).apply {
                 if (i > 0) marginStart = dockGap

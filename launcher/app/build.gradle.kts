@@ -11,8 +11,8 @@ android {
         applicationId = "tv.minimal.home"
         minSdk = 25
         targetSdk = 28 // Fire OS 7 = Android 9
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
     }
 
     buildTypes {

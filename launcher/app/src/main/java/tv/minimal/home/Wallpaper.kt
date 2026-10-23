@@ -20,12 +20,13 @@ import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.random.Random
 
+data class WallpaperChoice(val id: String, val label: String)
+
 /**
  * Rotating wallpaper shared by every home screen in the process (the launcher activity and the
- * instant overlay), so both always show the same photo. Sources, in priority order:
- *  1. your own photos in /sdcard/Android/data/tv.minimal.home/files/wallpapers (`adb push`),
- *  2. Bing's photos of the day (fetched by [BingPhotos] at most twice a day),
- *  3. soft generated landscapes (offline fallback).
+ * instant overlay), so both always show the same photo. The user can choose Bing photos,
+ * local images, or generated offline landscapes. Automatic mode retains the original priority:
+ * local images, then cached Bing photos, then offline landscapes.
  * Images are decoded off the UI thread so focus animations never stutter.
  */
 object WallpaperEngine {
@@ -35,7 +36,13 @@ object WallpaperEngine {
     var current: Frame? = null
         private set
 
-    private class Source(val caption: String?, val load: () -> Bitmap?)
+    private class Source(
+        val id: String,
+        val label: String,
+        val stamp: String,
+        val caption: String?,
+        val load: () -> Bitmap?,
+    )
 
     private const val INTERVAL_MS = 3 * 60 * 1000L
     private val EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
@@ -48,12 +55,43 @@ object WallpaperEngine {
     private var sources: List<Source> = emptyList()
     private var signature = ""
     private var index = 0
+    @Volatile private var generation = 0L
+    private var networkInFlight = false
     private val rotate = object : Runnable {
         override fun run() {
             next(fade = 2000)
             refreshBing()
-            main.postDelayed(this, INTERVAL_MS)
+            if (listeners.isNotEmpty()) main.postDelayed(this, INTERVAL_MS)
         }
+    }
+
+    /** Stable choices for the requested source; does not download or decode images. */
+    fun choices(context: Context, source: WallpaperPreferences.Source): List<WallpaperChoice> {
+        // Offline images are a rendering fallback, not misleading entries in an empty photo library.
+        if (source == WallpaperPreferences.Source.LOCAL && ownPhotos(context).isEmpty()) return emptyList()
+        if (source == WallpaperPreferences.Source.BING && cachedBing(context).isEmpty()) return emptyList()
+        return available(context.applicationContext, source).map { WallpaperChoice(it.id, it.label) }
+    }
+
+    /** Apply saved source/image selections immediately to both home views. Call from the UI thread. */
+    fun reload(context: Context) {
+        app = context.applicationContext
+        reloadSources(force = true)
+        refreshBing()
+        resetRotation()
+    }
+
+    /** Advance the current selection immediately, without waiting for the rotation timer. */
+    fun nextImage(context: Context) {
+        app = context.applicationContext
+        if (!reloadSources()) next(fade = 700)
+        refreshBing()
+        resetRotation()
+    }
+
+    private fun resetRotation() {
+        main.removeCallbacks(rotate)
+        if (listeners.isNotEmpty()) main.postDelayed(rotate, INTERVAL_MS)
     }
 
     /** Starts delivering frames to [listener] (immediately with the current one, without a fade). */
@@ -64,8 +102,7 @@ object WallpaperEngine {
         if (listeners.size == 1) {
             reloadSources()
             refreshBing()
-            main.removeCallbacks(rotate)
-            main.postDelayed(rotate, INTERVAL_MS)
+            resetRotation()
         }
     }
 
@@ -74,45 +111,106 @@ object WallpaperEngine {
         if (listeners.isEmpty()) main.removeCallbacks(rotate)
     }
 
-    /** Rebuilds the playlist if the available photos changed, and shows its first image. */
-    private fun reloadSources() {
-        val dm = app.resources.displayMetrics
-        val decode = { f: File -> decodeScaled(f, dm.widthPixels, dm.heightPixels) }
-        val own = app.getExternalFilesDir("wallpapers")
-            ?.listFiles { f -> f.extension.lowercase() in EXTENSIONS }.orEmpty().sortedBy { it.name }
-        val bing = if (own.isEmpty()) BingPhotos.cached(app) else emptyList()
-        val sig = own.joinToString { it.name + it.length() } + "|" + bing.joinToString { it.file.name }
-        if (sig == signature && sources.isNotEmpty()) return
-        signature = sig
-        sources = when {
-            own.isNotEmpty() -> own.shuffled().map { f -> Source(null) { decode(f) } }
-            // today's photo first, then the rest in random order
-            bing.isNotEmpty() -> (listOf(bing.first()) + bing.drop(1).shuffled())
-                .map { p -> Source(p.caption) { decode(p.file) } }
-            else -> PALETTES.shuffled().map { p -> Source(null) { paint(p) } }
+    private fun ownPhotos(context: Context): List<File> = context.getExternalFilesDir("wallpapers")
+        ?.listFiles { file -> file.isFile && file.extension.lowercase() in EXTENSIONS }
+        .orEmpty().sortedBy { it.name }
+
+    private fun cachedBing(context: Context): List<BingPhotos.Photo> =
+        runCatching { BingPhotos.cached(context) }.getOrDefault(emptyList())
+
+    private fun offlineSources(): List<Source> = PALETTES.mapIndexed { index, palette ->
+        Source("offline:${palette.seed}", PALETTE_NAMES[index], palette.seed.toString(), null) { paint(palette) }
+    }
+
+    private fun available(context: Context, requested: WallpaperPreferences.Source): List<Source> {
+        val dm = context.resources.displayMetrics
+        val decode = { file: File -> decodeScaled(file, dm.widthPixels, dm.heightPixels) }
+        val own = if (requested == WallpaperPreferences.Source.AUTO || requested == WallpaperPreferences.Source.LOCAL)
+            ownPhotos(context) else emptyList()
+        val bing = if (requested == WallpaperPreferences.Source.BING ||
+            (requested == WallpaperPreferences.Source.AUTO && own.isEmpty())) cachedBing(context) else emptyList()
+        return when (WallpaperPolicy.effectiveSource(requested, own.isNotEmpty(), bing.isNotEmpty())) {
+            WallpaperPreferences.Source.LOCAL -> own.map { file ->
+                Source("local:${file.name}", file.nameWithoutExtension,
+                    "${file.length()}:${file.lastModified()}", null) { decode(file) }
+            }
+            WallpaperPreferences.Source.BING -> bing.map { photo ->
+                Source("bing:${photo.file.name}", photo.caption?.takeIf { it.isNotBlank() }
+                    ?: photo.file.nameWithoutExtension,
+                    "${photo.file.length()}:${photo.file.lastModified()}", photo.caption) { decode(photo.file) }
+            }
+            else -> offlineSources()
         }
+    }
+
+    /** Rebuild when files or preferences change; one generation prevents old decodes winning a race. */
+    private fun reloadSources(force: Boolean = false): Boolean {
+        val requested = WallpaperPreferences.getSource(app)
+        val selected = WallpaperPreferences.getSelectedIds(app, requested)
+        val available = available(app, requested)
+        val selectedIds = WallpaperPolicy.select(available.map { it.id }, selected).toSet()
+        val sig = requested.name + "|" + (selected?.sorted()?.joinToString() ?: "all") + "|" +
+            available.joinToString { it.id + ":" + it.stamp }
+        if (!force && sig == signature && sources.isNotEmpty()) return false
+        generation++
+        signature = sig
+        val filtered = available.filter { it.id in selectedIds }
+        // Keep today's Bing photo first, randomize the remainder and local/offline collections.
+        sources = if (filtered.firstOrNull()?.id?.startsWith("bing:") == true)
+            filtered.take(1) + filtered.drop(1).shuffled() else filtered.shuffled()
         index = 0
-        next(fade = if (current == null) 700 else 2000)
+        next(fade = if (current == null) 700 else 1200)
+        return true
     }
 
     private fun refreshBing() {
+        if (networkInFlight) return
+        val requested = WallpaperPreferences.getSource(app)
+        if (!WallpaperPolicy.shouldRefreshBing(requested,
+                requested == WallpaperPreferences.Source.AUTO && ownPhotos(app).isNotEmpty())) return
+        networkInFlight = true
+        val context = app
         network.execute {
-            if (BingPhotos.refreshIfStale(app)) main.post { reloadSources() }
+            val activeSource = WallpaperPreferences.getSource(context)
+            val allowed = WallpaperPolicy.shouldRefreshBing(activeSource,
+                activeSource == WallpaperPreferences.Source.AUTO && ownPhotos(context).isNotEmpty())
+            val changed = allowed && runCatching { BingPhotos.refreshIfStale(context) }.getOrDefault(false)
+            main.post {
+                networkInFlight = false
+                if (changed) reloadSources()
+            }
         }
     }
 
     private fun next(fade: Long) {
         if (sources.isEmpty()) return
-        val source = sources[index++ % sources.size]
+        val source = sources[index % sources.size]
+        index = (index + 1) % sources.size
+        val request = ++generation
         worker.execute {
-            val bmp = runCatching { source.load() }.getOrNull() ?: return@execute
+            if (request != generation) return@execute
+            val bmp = runCatching { source.load() }.getOrNull()
             main.post {
+                if (request != generation) {
+                    bmp?.recycle() // never handed to an ImageView
+                    return@post
+                }
+                if (bmp == null) {
+                    // A removed/corrupt local file must not leave a changed source stuck on the old photo.
+                    sources = sources.filterNot { it.id == source.id }
+                    if (sources.isEmpty() && !source.id.startsWith("offline:")) sources = offlineSources()
+                    index = 0
+                    if (sources.isNotEmpty()) next(fade)
+                    return@post
+                }
                 val frame = Frame(bmp, source.caption)
                 current = frame
                 listeners.toList().forEach { it(frame, fade) }
             }
         }
     }
+
+    private val PALETTE_NAMES = listOf("Alpensee", "Wüste am Abend", "Morgennebel", "Nächtliche Berge", "Waldtal")
 
     private class Palette(
         val skyTop: Int, val skyBottom: Int, val glow: Int, val sunX: Float,
@@ -179,9 +277,17 @@ object WallpaperEngine {
     private fun decodeScaled(file: File, w: Int, h: Int): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, bounds)
-        var sample = 1
-        while (bounds.outWidth / (sample * 2) >= w && bounds.outHeight / (sample * 2) >= h) sample *= 2
-        return BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val maxWidth = w.coerceIn(1, 3840)
+        val maxHeight = h.coerceIn(1, 2160)
+        val sample = WallpaperPolicy.sampleSize(bounds.outWidth, bounds.outHeight, maxWidth, maxHeight)
+        val decoded = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
+            ?: return null
+        if (decoded.width <= maxWidth && decoded.height <= maxHeight) return decoded
+        // Keep the cap even if a decoder rounds or ignores its requested sample size.
+        val scale = minOf(maxWidth.toFloat() / decoded.width, maxHeight.toFloat() / decoded.height)
+        return Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt().coerceAtLeast(1),
+            (decoded.height * scale).toInt().coerceAtLeast(1), true).also { if (it !== decoded) decoded.recycle() }
     }
 }
 
@@ -199,6 +305,7 @@ class WallpaperLayer(context: Context) : FrameLayout(context) {
     }
     private var front = -1
     private var showing: Bitmap? = null
+    private var transition = 0L
     private val listener: (WallpaperEngine.Frame, Long) -> Unit = { frame, fade ->
         show(frame.bitmap, fade)
         onFrame?.invoke(frame, fade)
@@ -217,7 +324,10 @@ class WallpaperLayer(context: Context) : FrameLayout(context) {
     private fun show(bmp: Bitmap, fade: Long) {
         if (bmp === showing) return
         showing = bmp
+        val activeTransition = ++transition
+        layers.forEach { it.animate().cancel() }
         val out = layers.getOrNull(front)
+        out?.alpha = 1f
         front = if (front == 0) 1 else 0
         val into = layers[front]
         into.animate().cancel()
@@ -230,7 +340,9 @@ class WallpaperLayer(context: Context) : FrameLayout(context) {
         }
         into.alpha = 0f
         into.animate().alpha(1f).setDuration(fade).setInterpolator(DecelerateInterpolator())
-            .withEndAction { out?.apply { alpha = 0f; setImageDrawable(null) } }
+            .withEndAction {
+                if (activeTransition == transition) out?.apply { alpha = 0f; setImageDrawable(null) }
+            }
             .start()
     }
 }

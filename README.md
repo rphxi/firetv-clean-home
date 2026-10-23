@@ -15,8 +15,11 @@ Other Fire OS 7 TVs should work the same way; package names may differ slightly.
   Pick and reorder your quick access apps under **Anpassen**; press **Down** for all other apps.
   **Fire TV** opens Amazon's original home, alongside **Eingänge**, **Anpassen** and **Einstellungen**.
   Focus lifts tiles with a soft spring, a sheen and a white ring; rows glide instead of jumping.
-- **Wallpapers**: your own photos if you add any, otherwise Bing's photo of the day (fetched at most
-  twice a day, newest 16 kept), otherwise built-in generated landscapes. Rotates every 3 minutes.
+- **Wallpapers**: **Anpassen → Hintergrundbilder** selects automatic mode, Bing nature photos,
+  local images, or offline landscapes. Pick individual images for the three-minute rotation or
+  advance immediately. Own pictures can be imported through an available image picker/file manager.
+  Bing photos are fetched at most twice a day, newest 16 kept. The native Amazon Ambient image
+  collection is not bundled or accessed by this launcher.
 - **Debloat** (`debloat.sh`): disables Amazon's ad, tracking, promo and extra packages.
 - **Undo** (`restore.sh`, `removed-packages.txt`): re-enables everything that was disabled.
 
@@ -111,11 +114,19 @@ to third-party accessibility services. So:
   Enable **Home button redirect**. If Fire OS does not expose the service there, ADB setup
   may be needed. Fire OS 8 compatibility must be tested on the device; keep Amazon's launcher installed.
 - **Default dock apps**: `FAVORITES` in `launcher/app/src/main/java/tv/minimal/home/Apps.kt` (used before the first custom selection).
-- **Your own wallpapers** (override Bing): landscape jpg/png/webp, ideally 1920×1080:
+- **Background selection**: **Anpassen → Hintergrundbilder → Bildquelle wählen** chooses
+  automatic, Bing, own images or offline landscapes. **Bilder auswählen** saves a per-source
+  selection; **Alle verwenden** resets it, including future downloads. **Nächstes Bild anzeigen**
+  advances immediately. Source changes also update the accessibility overlay. With an empty photo
+  library the launcher shows offline landscapes until usable photos are available. Local/offline
+  modes do not start Bing downloads.
+- **Your own wallpapers**: use **Eigene Bilder hinzufügen** for JPG/PNG/WebP (up to 32 MB per image)
+  through an installed picker/file manager, or transfer landscape images, ideally 1920×1080:
+
   ```bash
   adb push ~/Pictures/tv-wallpapers/. /sdcard/Android/data/tv.minimal.home/files/wallpapers/
   ```
-  Remove them again to go back to Bing photos. The only network access the launcher makes is to bing.com for wallpapers.
+  Choose Bing in the background menu to switch back without deleting your own images. The only network access the launcher makes is to bing.com for wallpapers.
 
 ## Undo
 - Re-enable everything: `./restore.sh` (or `./restore.sh <package>` for one).

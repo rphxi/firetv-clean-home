@@ -38,6 +38,9 @@
         <activity android:name=".CustomizeActivity" android:exported="false"
             android:screenOrientation="landscape" />
 
+        <activity android:name=".WallpaperPickerActivity" android:exported="false"
+            android:screenOrientation="landscape" />
+
         <!-- Fire OS always sends the Home button to Amazon's launcher; this bounces it back here. -->
         <service
             android:name=".HomeRedirectService"
