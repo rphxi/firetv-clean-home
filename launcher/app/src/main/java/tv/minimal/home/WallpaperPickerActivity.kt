@@ -1,9 +1,15 @@
 package tv.minimal.home
 
+import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import java.io.File
 import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -20,7 +26,10 @@ class WallpaperPickerActivity : Activity() {
     private lateinit var summary: TextView
     private lateinit var sourceButton: Button
     private lateinit var importButton: Button
+    private lateinit var downloadButton: Button
     private var importing = false
+    private var importSource: WallpaperPreferences.Source? = null
+    private var importSelection: Set<String>? = null
     private val sources = WallpaperPreferences.Source.values()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,6 +60,7 @@ class WallpaperPickerActivity : Activity() {
             Toast.makeText(this, R.string.wallpaper_next_done, Toast.LENGTH_SHORT).show()
         }
         importButton = button(R.string.wallpaper_import) { openImagePicker() }
+        downloadButton = button(R.string.wallpaper_import_downloads) { requestDownloadImport() }
         button(R.string.wallpaper_back) { finish() }
         setContentView(ScrollView(this).apply {
             isFillViewport = true
@@ -151,6 +161,85 @@ class WallpaperPickerActivity : Activity() {
             .setPositiveButton(android.R.string.ok, null).show()
     }
 
+    private fun requestDownloadImport() {
+        if (importing) return
+        if (Build.VERSION.SDK_INT >= 33) {
+            Toast.makeText(this, R.string.wallpaper_download_picker_required, Toast.LENGTH_LONG).show()
+            openImagePicker()
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), READ_DOWNLOADS)
+        } else importDownloads()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == READ_DOWNLOADS) {
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) importDownloads()
+            else Toast.makeText(this, R.string.wallpaper_storage_denied, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun importDownloads() {
+        if (importing) return
+        beginImport()
+        val app = applicationContext
+        IMPORTER.execute {
+            val directory = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                "FireTV-Bilder")
+            val results = runCatching {
+                val candidates = directory.listFiles()
+                    ?: throw IllegalStateException("Download folder missing or not readable")
+                val images = candidates.filter { it.isFile && it.extension.lowercase() in WallpaperImagePolicy.extensions }
+                    .sortedBy { it.name }.take(100)
+                images.map { WallpaperImporter.importImage(app, Uri.fromFile(it)) }
+            }.getOrNull()
+            runOnUiThread {
+                if (results.isNullOrEmpty()) {
+                    importing = false
+                    if (!isFinishing && !isDestroyed) {
+                        importButton.isEnabled = true
+                        downloadButton.isEnabled = true
+                        AlertDialog.Builder(this).setTitle(R.string.wallpaper_import_downloads)
+                            .setMessage(R.string.wallpaper_downloads_empty)
+                            .setPositiveButton(android.R.string.ok, null).show()
+                    }
+                } else finishImport(results)
+            }
+        }
+    }
+
+    private fun beginImport() {
+        importSource = WallpaperPreferences.getSource(this)
+        importSelection = WallpaperPreferences.getSelectedIds(this, importSource!!)
+        importing = true
+        importButton.isEnabled = false
+        downloadButton.isEnabled = false
+    }
+
+    private fun finishImport(results: List<Boolean>) {
+        importing = false
+        val app = applicationContext
+        val currentSource = WallpaperPreferences.getSource(app)
+        val unchanged = currentSource == importSource &&
+            WallpaperPreferences.getSelectedIds(app, currentSource) == importSelection
+        // A newer choice (including from a newly opened settings screen) wins over this import.
+        if (results.any { it } && unchanged) {
+            WallpaperPreferences.setSource(app, WallpaperPreferences.Source.LOCAL)
+            WallpaperPreferences.setSelectedIds(app, WallpaperPreferences.Source.LOCAL, null)
+            WallpaperEngine.reload(app)
+        }
+        if (!isFinishing && !isDestroyed) {
+            importButton.isEnabled = true
+            downloadButton.isEnabled = true
+            refreshSummary()
+            Toast.makeText(this,
+                getString(R.string.wallpaper_import_result, results.count { it }, results.count { !it }),
+                Toast.LENGTH_LONG).show()
+        }
+    }
+
     @Deprecated("Uses the platform Activity result API to avoid additional runtime libraries")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -162,31 +251,17 @@ class WallpaperPickerActivity : Activity() {
             data.data?.let { add(it) }
         }.distinct().take(30)
         if (uris.isEmpty()) return
-        importing = true
-        importButton.isEnabled = false
+        beginImport()
         val app = applicationContext
         IMPORTER.execute {
             val results = uris.map { WallpaperImporter.importImage(app, it) }
-            runOnUiThread {
-                importing = false
-                if (results.any { it }) {
-                    WallpaperPreferences.setSource(app, WallpaperPreferences.Source.LOCAL)
-                    WallpaperPreferences.setSelectedIds(app, WallpaperPreferences.Source.LOCAL, null)
-                    WallpaperEngine.reload(app)
-                }
-                if (!isFinishing && !isDestroyed) {
-                    importButton.isEnabled = true
-                    refreshSummary()
-                    Toast.makeText(this,
-                        getString(R.string.wallpaper_import_result, results.count { it }, results.count { !it }),
-                        Toast.LENGTH_LONG).show()
-                }
-            }
+            runOnUiThread { finishImport(results) }
         }
     }
 
     companion object {
         private const val PICK_IMAGES = 42
+        private const val READ_DOWNLOADS = 43
         private val IMPORTER = Executors.newSingleThreadExecutor()
     }
 }

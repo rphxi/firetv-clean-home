@@ -42,4 +42,9 @@
     <string name="wallpaper_empty_online">Noch keine Naturfotos gespeichert. Mit Internetverbindung werden sie im Hintergrund geladen. Öffne die Bildauswahl danach erneut. Bis dahin erscheinen Offline-Landschaften.</string>
     <string name="wallpaper_no_picker">Auf diesem Fire TV ist keine passende Bildauswahl verfügbar. Versuche es mit einem Dateimanager wie X-plore oder übertrage eigene Bilder vom Computer.</string>
     <string name="wallpaper_import_result">%1$d Bilder übernommen, %2$d nicht übernommen. Unterstützt werden JPG, PNG, WebP und HEIC bis 32 MB pro Bild. HEIC benötigt einen passenden Decoder auf dem Gerät.</string>
+    <string name="wallpaper_import_downloads">Aus Download-Ordner importieren</string>
+    <string name="wallpaper_storage_denied">Für diesen Import ist der Zugriff auf Dateien erforderlich. Du kannst ihn beim nächsten Versuch zulassen oder die Bildauswahl verwenden.</string>
+    <string name="wallpaper_download_picker_required">Bitte auf diesem Gerät die Bildauswahl für den Download-Ordner verwenden.</string>
+    <string name="wallpaper_downloads_empty">Keine lesbaren Bilder in Download/FireTV-Bilder gefunden. Übertrage deine Bilder in diesen Ordner und versuche es erneut. Vorhandene Hintergründe bleiben erhalten.</string>
+    <string name="prime_android_tv">Prime Video (Android TV)</string>
 </resources>

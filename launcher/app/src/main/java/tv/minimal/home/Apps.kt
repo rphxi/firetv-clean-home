@@ -110,7 +110,8 @@ object Apps {
                     ?: ri.activityInfo
                 found[pkg] = AppEntry(
                     pkg = pkg,
-                    label = info.loadLabel(pm).toString().trim(),
+                    label = if (pkg == "com.amazon.amazonvideo.livingroom")
+                        context.getString(R.string.prime_android_tv) else info.loadLabel(pm).toString().trim(),
                     banner = info.loadBanner(pm),
                     icon = info.loadIcon(pm),
                     launchIntent = launch,

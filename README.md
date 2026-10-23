@@ -121,11 +121,16 @@ to third-party accessibility services. So:
   library the launcher shows offline landscapes until usable photos are available. Local/offline
   modes do not start Bing downloads. Local images honor EXIF orientation, including mirrored photos.
 - **Your own wallpapers**: use **Eigene Bilder hinzufügen** for JPG/PNG/WebP/HEIC/HEIF (up to 32 MB per image; HEIF requires device codec support)
-  through an installed picker/file manager, or transfer landscape images, ideally 1920×1080:
-
+  through an installed picker/file manager. On Fire OS 8, ADB may not access Android/data directly.
+  Stage images in a shared Download folder instead:
   ```bash
-  adb push ~/Pictures/tv-wallpapers/. /sdcard/Android/data/tv.minimal.home/files/wallpapers/
+  adb shell mkdir -p /sdcard/Download/FireTV-Bilder
+  adb push ~/Pictures/tv-wallpapers/. /sdcard/Download/FireTV-Bilder/
   ```
+  Then choose **Anpassen → Hintergrundbilder → Aus Download-Ordner importieren** and allow file access.
+  The launcher copies the staged images into its own folder; source files in Download remain unchanged.
+  Shared-folder import is for Android API 25–32 (including Fire OS 8 / Android 11); on newer versions
+  use the document picker. File access is requested only when you choose the shared-folder import.
   Choose Bing in the background menu to switch back without deleting your own images. The only network access the launcher makes is to bing.com for wallpapers.
 
 ## Undo

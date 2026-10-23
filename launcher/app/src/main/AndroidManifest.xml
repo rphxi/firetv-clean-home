@@ -4,6 +4,8 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Optional, requested only when importing the user's staged Download/FireTV-Bilder folder. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <!-- only used to fetch Bing photo-of-the-day wallpapers -->
     <uses-permission android:name="android.permission.INTERNET" />
 
