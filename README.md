@@ -16,8 +16,8 @@ Other Fire OS 7 TVs should work the same way; package names may differ slightly.
   **Fire TV** opens Amazon's original home, alongside **Eingänge**, **Anpassen** and **Einstellungen**.
   Focus lifts tiles with a soft spring, a sheen and a white ring; rows glide instead of jumping.
 - **Wallpapers**: **Anpassen → Hintergrundbilder** selects automatic mode, Bing nature photos,
-  local images, or offline landscapes. Pick individual images for the three-minute rotation or
-  advance immediately. Own pictures can be imported through an available image picker/file manager.
+  local images, or offline landscapes. Pick individual images for the ten-second rotation or
+  advance immediately. Rotation pauses while the home window is hidden. Own pictures can be imported through an available image picker/file manager.
   Bing photos are fetched at most twice a day, newest 16 kept. The native Amazon Ambient image
   collection is not bundled or accessed by this launcher.
 - **Debloat** (`debloat.sh`): disables Amazon's ad, tracking, promo and extra packages.

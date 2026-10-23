@@ -22,7 +22,7 @@
     <string name="good_afternoon">Guten Tag</string>
     <string name="good_evening">Guten Abend</string>
     <string name="wallpaper_title">Hintergrundbilder</string>
-    <string name="wallpaper_description">Wähle deine Bildquelle und die Bilder für den Wechsel alle drei Minuten. Amazons Ambient-Bildersammlung wird hier nicht übernommen.</string>
+    <string name="wallpaper_description">Wähle deine Bildquelle und die Bilder für den Wechsel alle zehn Sekunden. Amazons Ambient-Bildersammlung wird hier nicht übernommen.</string>
     <string name="wallpaper_source">Bildquelle wählen</string>
     <string name="wallpaper_source_value">Bildquelle: %1$s</string>
     <string name="wallpaper_auto">Automatisch</string>

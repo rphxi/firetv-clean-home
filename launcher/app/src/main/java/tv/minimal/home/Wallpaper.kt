@@ -47,7 +47,7 @@ object WallpaperEngine {
         val load: () -> Bitmap?,
     )
 
-    private const val INTERVAL_MS = 3 * 60 * 1000L
+    private const val INTERVAL_MS = 10_000L
     private val EXTENSIONS = WallpaperImagePolicy.extensions
 
     private lateinit var app: Context
@@ -324,6 +324,7 @@ class WallpaperLayer(context: Context) : FrameLayout(context) {
     private var showing: Bitmap? = null
     private var showingFitCenter = false
     private var transition = 0L
+    private var subscribed = false
     private val listener: (WallpaperEngine.Frame, Long) -> Unit = { frame, fade ->
         show(frame.bitmap, fade, frame.fitCenter)
         onFrame?.invoke(frame, fade)
@@ -331,11 +332,24 @@ class WallpaperLayer(context: Context) : FrameLayout(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        WallpaperEngine.attach(context, listener)
+        updateSubscription()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        updateSubscription()
+    }
+
+    private fun updateSubscription() {
+        val visible = isAttachedToWindow && windowVisibility == VISIBLE
+        if (visible == subscribed) return
+        subscribed = visible
+        if (visible) WallpaperEngine.attach(context, listener) else WallpaperEngine.detach(listener)
     }
 
     override fun onDetachedFromWindow() {
-        WallpaperEngine.detach(listener)
+        if (subscribed) WallpaperEngine.detach(listener)
+        subscribed = false
         super.onDetachedFromWindow()
     }
 
