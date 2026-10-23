@@ -36,12 +36,8 @@ internal object WallpaperImporter {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(temporary.path, bounds)
             check(bounds.outWidth > 0 && bounds.outHeight > 0) { "Invalid image" }
-            val extension = when (bounds.outMimeType) {
-                "image/jpeg" -> "jpg"
-                "image/png" -> "png"
-                "image/webp" -> "webp"
-                else -> error("Unsupported image format")
-            }
+            val extension = WallpaperImagePolicy.extensionForMime(bounds.outMimeType)
+                ?: error("Unsupported image format")
             val hash = digest.digest().joinToString("") { "%02x".format(it) }
             val displayName = runCatching {
                 context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {

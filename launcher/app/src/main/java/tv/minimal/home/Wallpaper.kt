@@ -5,10 +5,12 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
+import android.media.ExifInterface
 import android.os.Handler
 import android.os.Looper
 import android.view.animation.DecelerateInterpolator
@@ -30,7 +32,7 @@ data class WallpaperChoice(val id: String, val label: String)
  * Images are decoded off the UI thread so focus animations never stutter.
  */
 object WallpaperEngine {
-    class Frame(val bitmap: Bitmap, val caption: String?)
+    class Frame(val bitmap: Bitmap, val caption: String?, val fitCenter: Boolean = false)
 
     /** The photo currently on screen; kept while nothing is attached so the next view shows it instantly. */
     var current: Frame? = null
@@ -41,11 +43,12 @@ object WallpaperEngine {
         val label: String,
         val stamp: String,
         val caption: String?,
+        val fitCenter: Boolean = false,
         val load: () -> Bitmap?,
     )
 
     private const val INTERVAL_MS = 3 * 60 * 1000L
-    private val EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
+    private val EXTENSIONS = WallpaperImagePolicy.extensions
 
     private lateinit var app: Context
     private val listeners = LinkedHashSet<(Frame, Long) -> Unit>()
@@ -132,7 +135,7 @@ object WallpaperEngine {
         return when (WallpaperPolicy.effectiveSource(requested, own.isNotEmpty(), bing.isNotEmpty())) {
             WallpaperPreferences.Source.LOCAL -> own.map { file ->
                 Source("local:${file.name}", file.nameWithoutExtension,
-                    "${file.length()}:${file.lastModified()}", null) { decode(file) }
+                    "${file.length()}:${file.lastModified()}", null, fitCenter = true) { decode(file) }
             }
             WallpaperPreferences.Source.BING -> bing.map { photo ->
                 Source("bing:${photo.file.name}", photo.caption?.takeIf { it.isNotBlank() }
@@ -203,7 +206,7 @@ object WallpaperEngine {
                     if (sources.isNotEmpty()) next(fade)
                     return@post
                 }
-                val frame = Frame(bmp, source.caption)
+                val frame = Frame(bmp, source.caption, source.fitCenter)
                 current = frame
                 listeners.toList().forEach { it(frame, fade) }
             }
@@ -280,14 +283,28 @@ object WallpaperEngine {
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
         val maxWidth = w.coerceIn(1, 3840)
         val maxHeight = h.coerceIn(1, 2160)
-        val sample = WallpaperPolicy.sampleSize(bounds.outWidth, bounds.outHeight, maxWidth, maxHeight)
+        val exifOrientation = runCatching {
+            ExifInterface(file.path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+        val orientation = WallpaperImagePolicy.orientation(exifOrientation)
+        val sample = WallpaperImagePolicy.sampleSize(
+            bounds.outWidth, bounds.outHeight, maxWidth, maxHeight, exifOrientation)
         val decoded = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
-            ?: return null
-        if (decoded.width <= maxWidth && decoded.height <= maxHeight) return decoded
+            ?: return null // HEIF may not have a native decoder on older devices.
+        val upright = if (orientation.degrees == 0 && !orientation.flipHorizontal) decoded else {
+            val matrix = Matrix().apply {
+                if (orientation.degrees != 0) setRotate(orientation.degrees.toFloat())
+                if (orientation.flipHorizontal) postScale(-1f, 1f)
+            }
+            // These bitmaps are still private to the worker, never used by an ImageView.
+            Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+                .also { if (it !== decoded) decoded.recycle() }
+        }
+        if (upright.width <= maxWidth && upright.height <= maxHeight) return upright
         // Keep the cap even if a decoder rounds or ignores its requested sample size.
-        val scale = minOf(maxWidth.toFloat() / decoded.width, maxHeight.toFloat() / decoded.height)
-        return Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt().coerceAtLeast(1),
-            (decoded.height * scale).toInt().coerceAtLeast(1), true).also { if (it !== decoded) decoded.recycle() }
+        val scale = minOf(maxWidth.toFloat() / upright.width, maxHeight.toFloat() / upright.height)
+        return Bitmap.createScaledBitmap(upright, (upright.width * scale).toInt().coerceAtLeast(1),
+            (upright.height * scale).toInt().coerceAtLeast(1), true).also { if (it !== upright) upright.recycle() }
     }
 }
 
@@ -305,9 +322,10 @@ class WallpaperLayer(context: Context) : FrameLayout(context) {
     }
     private var front = -1
     private var showing: Bitmap? = null
+    private var showingFitCenter = false
     private var transition = 0L
     private val listener: (WallpaperEngine.Frame, Long) -> Unit = { frame, fade ->
-        show(frame.bitmap, fade)
+        show(frame.bitmap, fade, frame.fitCenter)
         onFrame?.invoke(frame, fade)
     }
 
@@ -321,9 +339,10 @@ class WallpaperLayer(context: Context) : FrameLayout(context) {
         super.onDetachedFromWindow()
     }
 
-    private fun show(bmp: Bitmap, fade: Long) {
-        if (bmp === showing) return
+    private fun show(bmp: Bitmap, fade: Long, fitCenter: Boolean) {
+        if (bmp === showing && fitCenter == showingFitCenter) return
         showing = bmp
+        showingFitCenter = fitCenter
         val activeTransition = ++transition
         layers.forEach { it.animate().cancel() }
         val out = layers.getOrNull(front)
@@ -331,6 +350,9 @@ class WallpaperLayer(context: Context) : FrameLayout(context) {
         front = if (front == 0) 1 else 0
         val into = layers[front]
         into.animate().cancel()
+        // Preserve every part of private photos; opaque bars also crossfade cleanly from scenic images.
+        into.scaleType = if (fitCenter) ImageView.ScaleType.FIT_CENTER else ImageView.ScaleType.CENTER_CROP
+        into.setBackgroundColor(if (fitCenter) 0xFF07090D.toInt() else 0x00000000)
         into.setImageBitmap(bmp)
         into.bringToFront() // fade the new image in on top, so there's no dark dip mid-crossfade
         if (fade <= 0) {

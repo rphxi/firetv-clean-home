@@ -38,8 +38,8 @@
     <string name="wallpaper_save">Speichern</string>
     <string name="wallpaper_use_all">Alle verwenden</string>
     <string name="wallpaper_choose_one">Wähle mindestens ein Bild aus.</string>
-    <string name="wallpaper_empty_local">Noch keine eigenen Bilder vorhanden. Wähle „Eigene Bilder hinzufügen“, um JPG-, PNG- oder WebP-Bilder auszuwählen.</string>
+    <string name="wallpaper_empty_local">Noch keine eigenen Bilder vorhanden. Wähle „Eigene Bilder hinzufügen“, um JPG-, PNG-, WebP- oder HEIC-Bilder auszuwählen.</string>
     <string name="wallpaper_empty_online">Noch keine Naturfotos gespeichert. Mit Internetverbindung werden sie im Hintergrund geladen. Öffne die Bildauswahl danach erneut. Bis dahin erscheinen Offline-Landschaften.</string>
     <string name="wallpaper_no_picker">Auf diesem Fire TV ist keine passende Bildauswahl verfügbar. Versuche es mit einem Dateimanager wie X-plore oder übertrage eigene Bilder vom Computer.</string>
-    <string name="wallpaper_import_result">%1$d Bilder übernommen, %2$d nicht übernommen. Unterstützt werden JPG, PNG und WebP bis 32 MB pro Bild.</string>
+    <string name="wallpaper_import_result">%1$d Bilder übernommen, %2$d nicht übernommen. Unterstützt werden JPG, PNG, WebP und HEIC bis 32 MB pro Bild. HEIC benötigt einen passenden Decoder auf dem Gerät.</string>
 </resources>

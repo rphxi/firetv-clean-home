@@ -119,8 +119,8 @@ to third-party accessibility services. So:
   selection; **Alle verwenden** resets it, including future downloads. **Nächstes Bild anzeigen**
   advances immediately. Source changes also update the accessibility overlay. With an empty photo
   library the launcher shows offline landscapes until usable photos are available. Local/offline
-  modes do not start Bing downloads.
-- **Your own wallpapers**: use **Eigene Bilder hinzufügen** for JPG/PNG/WebP (up to 32 MB per image)
+  modes do not start Bing downloads. Local images honor EXIF orientation, including mirrored photos.
+- **Your own wallpapers**: use **Eigene Bilder hinzufügen** for JPG/PNG/WebP/HEIC/HEIF (up to 32 MB per image; HEIF requires device codec support)
   through an installed picker/file manager, or transfer landscape images, ideally 1920×1080:
 
   ```bash
