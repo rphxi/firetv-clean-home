@@ -10,9 +10,10 @@ Built for and tested on an **Insignia NS-55F501NA22** (Amazon `AFTDCT31`, Fire O
 Other Fire OS 7 TVs should work the same way; package names may differ slightly.
 
 ## What you get
-- **Home screen** (`launcher/`): greeting, clock and date top-left; **Inputs** and **Settings** pills
-  top-right; a frosted dock with Netflix, YouTube, Prime Video, Disney+, Max, Hulu, Apple TV, Peacock,
-  Paramount+ and YouTube TV (whichever are installed); press **Down** for all other apps.
+- **Home screen** (`launcher/`): a tvOS-inspired layout with a compact Home header, clock/date,
+  full-screen photos, a large focused-app title and a translucent dock of large rounded app cards.
+  Pick and reorder your quick access apps under **Anpassen**; press **Down** for all other apps.
+  **Fire TV** opens Amazon's original home, alongside **Eingänge**, **Anpassen** and **Einstellungen**.
   Focus lifts tiles with a soft spring, a sheen and a white ring; rows glide instead of jumping.
 - **Wallpapers**: your own photos if you add any, otherwise Bing's photo of the day (fetched at most
   twice a day, newest 16 kept), otherwise built-in generated landscapes. Rotates every 3 minutes.
@@ -102,6 +103,10 @@ to third-party accessibility services. So:
   are appended. Use **Anpassen → Schnellzugriffe verschieben**, select an app and choose
   **Nach links verschieben** or **Nach rechts verschieben** to reorder the dock. Each move is saved
   immediately. The selection survives app and device restarts, including an intentionally empty dock.
+- **Original Amazon home**: select **Fire TV** in the header. Automatic Home redirection pauses,
+  including after sleep and reboot, so Amazon's home stays open. To return, explicitly open the
+  **Home** app from Amazon's app list (or run `adb shell am start -n tv.minimal.home/.MainActivity`).
+  This resumes the custom launcher and its Home-button redirect; Amazon's launcher is never removed.
 - **Home button**: **Anpassen → Home-Taste einrichten** opens accessibility settings.
   Enable **Home button redirect**. If Fire OS does not expose the service there, ADB setup
   may be needed. Fire OS 8 compatibility must be tested on the device; keep Amazon's launcher installed.

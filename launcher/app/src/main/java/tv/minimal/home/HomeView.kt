@@ -40,7 +40,7 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
     }
 
     private val pad = context.dpi(56)
-    private val dockPad = context.dpi(14)
+    private val dockPad = context.dpi(20)
     private val screenH = resources.displayMetrics.heightPixels
 
     private val dim: View
@@ -49,6 +49,9 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
     private lateinit var inputs: Pill
     private lateinit var settings: Pill
     private lateinit var customize: Pill
+    private lateinit var originalHome: Pill
+    private lateinit var selectionLabel: TextView
+    private lateinit var selectionHint: TextView
     private val caption: TextView
     private lateinit var dock: FrameLayout
     private lateinit var dockFrame: GlideFrame
@@ -68,7 +71,7 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
         addView(View(context).apply {
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(0x80000000.toInt(), 0x14000000, 0x00000000, 0x26000000, 0xA6000000.toInt()),
+                intArrayOf(0xB30A0D14.toInt(), 0x300A0D14, 0x120A0D14, 0x660A0D14, 0xE60A0D14.toInt()),
             )
         }, LayoutParams(MATCH_PARENT, MATCH_PARENT))
         dim = View(context).apply { setBackgroundColor(Color.BLACK); alpha = 0f }
@@ -88,10 +91,10 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
         val hero = FrameLayout(context).apply { clipChildren = false }
         column.addView(hero, LinearLayout.LayoutParams(MATCH_PARENT, screenH))
         hero.addView(buildHeader(), LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP).apply {
-            topMargin = context.dpi(34)
+            topMargin = context.dpi(28)
         })
         hero.addView(buildDockArea(), LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.BOTTOM).apply {
-            bottomMargin = context.dpi(14)
+            bottomMargin = context.dpi(20)
         })
         // Photo location + credit, on the same line as the "All Apps" hint.
         caption = TextView(context).apply {
@@ -104,15 +107,15 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
             softShadow()
         }
         hero.addView(caption, LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.BOTTOM or Gravity.END).apply {
-            bottomMargin = context.dpi(14)
+            bottomMargin = context.dpi(20)
             marginEnd = pad
         })
         wallpaper.onFrame = { frame, fade -> showCaption(frame.caption, fade > 0) }
 
         // Below the fold: everything else.
         allTitle = TextView(context).apply {
-            text = "All Apps"
-            textSize = 15f
+            setText(R.string.all_apps)
+            textSize = 26f
             typeface = MEDIUM
             letterSpacing = 0.02f
             setTextColor(0xB3FFFFFF.toInt())
@@ -169,6 +172,7 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
             otherFocus === other.inputs -> inputs
             otherFocus === other.settings -> settings
             otherFocus === other.customize -> customize
+            otherFocus === other.originalHome -> originalHome
             else -> other.focusedPkg?.let { p -> allTiles().firstOrNull { it.app.pkg == p } } ?: firstTile
         }
         target?.requestFocus()
@@ -220,62 +224,82 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
 
     private fun buildHeader(): View {
         greeting = TextView(context).apply {
-            textSize = 13f
+            textSize = 12f
             typeface = MEDIUM
-            letterSpacing = 0.16f
-            setTextColor(0xD9FFFFFF.toInt())
+            setTextColor(0xBFFFFFFF.toInt())
+            softShadow()
+        }
+        val wordmark = TextView(context).apply {
+            setText(R.string.app_name)
+            textSize = 30f
+            typeface = MEDIUM
+            letterSpacing = -0.03f
+            setTextColor(Color.WHITE)
             softShadow()
         }
         val clock = TextClock(context).apply {
             format12Hour = "h:mm"
             format24Hour = "H:mm"
-            textSize = 66f
+            textSize = 25f
             typeface = LIGHT
-            letterSpacing = -0.01f
-            includeFontPadding = false
             setTextColor(Color.WHITE)
+            gravity = Gravity.END
             softShadow()
         }
         val date = TextClock(context).apply {
-            format12Hour = "EEEE, MMMM d"
-            format24Hour = "EEEE, MMMM d"
-            isAllCaps = true
-            textSize = 12f
-            typeface = MEDIUM
-            letterSpacing = 0.14f
-            setTextColor(0xB3FFFFFF.toInt())
+            format12Hour = "EEE, d. MMM"
+            format24Hour = "EEE, d. MMM"
+            textSize = 11f
+            setTextColor(0xBFFFFFFF.toInt())
+            gravity = Gravity.END
             softShadow()
         }
-        val left = LinearLayout(context).apply {
+        val brand = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
+            addView(wordmark)
             addView(greeting)
-            addView(clock, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { topMargin = context.dpi(2) })
-            addView(date, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { topMargin = context.dpi(2) })
         }
-        inputs = Pill(context, R.drawable.ic_input, "Inputs").apply { setOnClickListener { openInputs() } }
-        settings = Pill(context, R.drawable.ic_settings, "Settings").apply {
+        val time = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.END
+            addView(clock)
+            addView(date)
+        }
+        val masthead = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(brand, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            addView(time)
+        }
+        originalHome = Pill(context, R.drawable.ic_home, context.getString(R.string.fire_tv)).apply {
+            setOnClickListener { HomeRedirectService.openOriginalHome(context) }
+        }
+        inputs = Pill(context, R.drawable.ic_input, context.getString(R.string.inputs)).apply {
+            setOnClickListener { openInputs() }
+        }
+        settings = Pill(context, R.drawable.ic_settings, context.getString(R.string.settings)).apply {
             setOnClickListener { host.open(HomeRedirectService.amazonSettingsIntent()) }
         }
-        customize = Pill(context, R.drawable.ic_settings, "Anpassen").apply {
+        customize = Pill(context, R.drawable.ic_customize, context.getString(R.string.customize)).apply {
             setOnClickListener { host.open(Intent(context, CustomizeActivity::class.java)) }
         }
-        val right = LinearLayout(context).apply {
+        val controls = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             clipChildren = false
-            addView(customize, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
-                marginEnd = context.dpi(10)
-            })
-            addView(inputs)
-            addView(settings, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
-                marginStart = context.dpi(10)
-            })
+            listOf(originalHome, inputs, customize, settings).forEachIndexed { index, control ->
+                addView(control, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+                    if (index > 0) marginStart = context.dpi(12)
+                })
+            }
         }
         return LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = LinearLayout.VERTICAL
             clipChildren = false
             setPadding(pad, 0, pad, 0)
-            addView(left, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-            addView(right, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { topMargin = context.dpi(2) })
+            addView(masthead)
+            addView(controls, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+                topMargin = context.dpi(18)
+            })
         }
     }
 
@@ -286,20 +310,23 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
             clipToPadding = false
             setPadding(dockPad, dockPad, dockPad, dockPad)
         }
-        dockFrame = GlideFrame(context, horizontal = true, edgeDp = 14f)
+        dockFrame = GlideFrame(context, horizontal = true, edgeDp = 20f)
         dockFrame.addView(dockRow, LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
         dock = FrameLayout(context).apply {
             // Frosted-glass panel: translucent fill, hairline border, clipped to its rounded shape.
-            background = GradientDrawable().apply {
-                cornerRadius = context.dp(22)
-                setColor(0x4D0B0F18)
-                setStroke(context.dpi(1), 0x33FFFFFF)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0x80424B5C.toInt(), 0xB31C2331.toInt()),
+            ).apply {
+                cornerRadius = context.dp(28)
+                setStroke(context.dpi(1), 0x40FFFFFF)
             }
+            elevation = context.dp(8)
             clipToOutline = true
-            addView(dockFrame, LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
+            addView(dockFrame, LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
         hint = TextView(context).apply {
-            text = "All Apps"
+            setText(R.string.all_apps)
             textSize = 12f
             typeface = MEDIUM
             letterSpacing = 0.06f
@@ -314,10 +341,38 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
             setCompoundDrawablesRelative(null, null, chevron, null)
             compoundDrawablePadding = context.dpi(2)
         }
+        selectionLabel = TextView(context).apply {
+            setText(R.string.quick_access)
+            textSize = 38f
+            typeface = MEDIUM
+            letterSpacing = -0.03f
+            setTextColor(Color.WHITE)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            softShadow()
+        }
+        selectionHint = TextView(context).apply {
+            setText(R.string.customize_hint)
+            textSize = 13f
+            setTextColor(0xC7FFFFFF.toInt())
+            softShadow()
+        }
+        val heading = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(selectionLabel)
+            addView(selectionHint, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+                topMargin = context.dpi(3)
+            })
+        }
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             clipChildren = false
-            addView(dock, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+            addView(heading, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                marginStart = pad
+                marginEnd = pad
+                bottomMargin = context.dpi(18)
+            })
+            addView(dock, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
                 marginStart = pad
                 marginEnd = pad
             })
@@ -334,10 +389,10 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
         val contentW = resources.displayMetrics.widthPixels - 2 * pad
 
         dockRow.removeAllViews()
-        val dockGap = context.dpi(14)
-        val dockW = context.dpi(146)
+        val dockGap = context.dpi(20)
+        val dockW = context.dpi(176)
         catalog.favorites.forEachIndexed { i, app ->
-            dockRow.addView(tile(app, cornerDp = 12f), LinearLayout.LayoutParams(dockW, dockW * 9 / 16).apply {
+            dockRow.addView(tile(app, cornerDp = 16f), LinearLayout.LayoutParams(dockW, dockW * 9 / 16).apply {
                 if (i > 0) marginStart = dockGap
             })
         }
@@ -345,7 +400,7 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
 
         grid.removeAllViews()
         val cols = 5
-        val gap = context.dpi(22)
+        val gap = context.dpi(28)
         val w = (contentW - (cols - 1) * gap) / cols
         catalog.others.chunked(cols).forEachIndexed { r, rowApps ->
             val row = LinearLayout(context).apply {
@@ -353,7 +408,7 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
                 clipChildren = false
             }
             rowApps.forEachIndexed { i, app ->
-                row.addView(tile(app, cornerDp = 11f), LinearLayout.LayoutParams(w, w * 9 / 16).apply {
+                row.addView(tile(app, cornerDp = 14f), LinearLayout.LayoutParams(w, w * 9 / 16).apply {
                     if (i > 0) marginStart = gap
                 })
             }
@@ -365,7 +420,7 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
         hint.visibility = allTitle.visibility
 
         val tiles = allTiles()
-        firstTile = tiles.firstOrNull()
+        firstTile = if (catalog.favorites.isNotEmpty()) dockRow.getChildAt(0) else customize
         val target = focusPkg?.let { pkg -> tiles.firstOrNull { it.app.pkg == pkg } } ?: firstTile
         post { target?.requestFocus() }
     }
@@ -390,10 +445,24 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
         inputs.settle()
         settings.settle()
         customize.settle()
+        originalHome.settle()
     }
 
     private fun onFocusMoved(now: View?) {
         now ?: return
+        selectionLabel.text = when (now) {
+            is AppTile -> now.app.label
+            originalHome -> context.getString(R.string.fire_tv)
+            inputs -> context.getString(R.string.inputs)
+            settings -> context.getString(R.string.settings)
+            else -> context.getString(R.string.quick_access)
+        }
+        selectionHint.setText(when (now) {
+            is AppTile -> R.string.open_app_hint
+            originalHome -> R.string.fire_tv_hint
+            inputs, settings -> R.string.open_settings_hint
+            else -> R.string.customize_hint
+        })
         var p: android.view.ViewParent? = now.parent
         while (p != null) {
             if (p is GlideFrame) p.reveal(now)
@@ -431,9 +500,9 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
 
     private fun updateGreeting() {
         greeting.text = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
-            in 5..11 -> "GOOD MORNING"
-            in 12..16 -> "GOOD AFTERNOON"
-            else -> "GOOD EVENING"
+            in 5..11 -> context.getString(R.string.good_morning)
+            in 12..16 -> context.getString(R.string.good_afternoon)
+            else -> context.getString(R.string.good_evening)
         }
     }
 

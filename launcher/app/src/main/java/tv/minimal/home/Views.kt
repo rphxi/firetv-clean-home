@@ -57,7 +57,7 @@ class AppTile(context: Context, val app: AppEntry, cornerDp: Float) : View(conte
     private val sheenMatrix = Matrix()
     private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = context.dp(2.5f)
+        strokeWidth = context.dp(2f)
         color = Color.WHITE
     }
     private val labelPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -76,6 +76,7 @@ class AppTile(context: Context, val app: AppEntry, cornerDp: Float) : View(conte
     init {
         isFocusable = true
         isClickable = true
+        elevation = context.dp(3)
         noDefaultFocusHighlight()
         outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) =
@@ -142,7 +143,7 @@ class AppTile(context: Context, val app: AppEntry, cornerDp: Float) : View(conte
         super.onFocusChanged(gained, direction, previous)
         animate().cancel()
         if (gained) {
-            animate().scaleX(FOCUS_SCALE).scaleY(FOCUS_SCALE).translationZ(context.dp(12))
+            animate().scaleX(FOCUS_SCALE).scaleY(FOCUS_SCALE).translationZ(context.dp(18))
                 .setDuration(280).setInterpolator(OvershootInterpolator(1.2f)).start()
             animateFocus(1f)
             startSheen()
@@ -164,7 +165,7 @@ class AppTile(context: Context, val app: AppEntry, cornerDp: Float) : View(conte
         val f = isFocused
         scaleX = if (f) FOCUS_SCALE else 1f
         scaleY = scaleX
-        translationZ = if (f) context.dp(12) else 0f
+        translationZ = if (f) context.dp(18) else 0f
         focusAmount = if (f) 1f else 0f
         sheen = -1f
         invalidate()
@@ -199,8 +200,8 @@ class AppTile(context: Context, val app: AppEntry, cornerDp: Float) : View(conte
     }
 
     companion object {
-        const val FOCUS_SCALE = 1.11f
-        const val PRESS_SCALE = 1.04f
+        const val FOCUS_SCALE = 1.09f
+        const val PRESS_SCALE = 1.025f
     }
 }
 
@@ -215,7 +216,7 @@ class Pill(context: Context, iconRes: Int, text: String) : LinearLayout(context)
     private val icon = ImageView(context).apply { setImageResource(iconRes); setColorFilter(Color.WHITE) }
     private val label = TextView(context).apply {
         this.text = text
-        textSize = 13f
+        textSize = 12f
         typeface = MEDIUM
         setTextColor(Color.WHITE)
     }
@@ -229,7 +230,7 @@ class Pill(context: Context, iconRes: Int, text: String) : LinearLayout(context)
         isFocusable = true
         isClickable = true
         noDefaultFocusHighlight()
-        setPadding(context.dpi(12), context.dpi(6), context.dpi(15), context.dpi(6))
+        setPadding(context.dpi(14), context.dpi(9), context.dpi(17), context.dpi(9))
         addView(icon, LayoutParams(context.dpi(15), context.dpi(15)).apply { marginEnd = context.dpi(6) })
         addView(label)
     }
@@ -260,10 +261,13 @@ class Pill(context: Context, iconRes: Int, text: String) : LinearLayout(context)
         scaleY = s
         current = if (isFocused) Color.WHITE else IDLE
         bg.setColor(current)
+        val foreground = if (isFocused) 0xFF101217.toInt() else Color.WHITE
+        icon.setColorFilter(foreground)
+        label.setTextColor(foreground)
     }
 
     companion object {
-        private const val IDLE = 0x40000000
+        private const val IDLE = 0x66404A5C
     }
 }
 

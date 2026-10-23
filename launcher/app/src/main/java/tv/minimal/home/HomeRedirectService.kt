@@ -43,7 +43,8 @@ class HomeRedirectService : AccessibilityService() {
 
     private val verify = object : Runnable {
         override fun run() {
-            if (MainActivity.visible || !amazonHomeInFront || retries >= MAX_RETRIES) return
+            if (OriginalHomeMode.isActive(this@HomeRedirectService) || MainActivity.visible ||
+                !amazonHomeInFront || retries >= MAX_RETRIES) return
             retries++
             goHome(this@HomeRedirectService)
             handler.postDelayed(this, RETRY_MS)
@@ -74,12 +75,13 @@ class HomeRedirectService : AccessibilityService() {
      * the redirect. Put the launcher back on top while the screen is still off instead.
      */
     private val homeWhileAsleep = Runnable {
-        if (!powerManager.isInteractive && !MainActivity.visible) goHome(this)
+        if (!OriginalHomeMode.isActive(this) && !powerManager.isInteractive && !MainActivity.visible) goHome(this)
     }
 
     /** Backup for the above: just after waking, if Amazon's home is showing anyway, cover it. */
     private val checkAfterWake = Runnable {
-        if (!MainActivity.visible && rootInActiveWindow?.packageName?.toString() == AMAZON_LAUNCHER) {
+        if (!OriginalHomeMode.isActive(this) && !MainActivity.visible &&
+            rootInActiveWindow?.packageName?.toString() == AMAZON_LAUNCHER) {
             amazonHomeInFront = true
             redirect()
         }
@@ -87,6 +89,12 @@ class HomeRedirectService : AccessibilityService() {
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            if (OriginalHomeMode.isActive(this@HomeRedirectService)) {
+                if (intent.action == Intent.ACTION_DREAMING_STARTED) dreaming = true
+                if (intent.action == Intent.ACTION_DREAMING_STOPPED) dreaming = false
+                pauseRedirect()
+                return
+            }
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     hideOverlay()
@@ -117,7 +125,7 @@ class HomeRedirectService : AccessibilityService() {
             addAction(Intent.ACTION_DREAMING_STARTED)
             addAction(Intent.ACTION_DREAMING_STOPPED)
         })
-        handler.postDelayed({ overlayView() }, 3000) // build ahead of time so the first Home is instant
+        handler.postDelayed({ if (!OriginalHomeMode.isActive(this)) overlayView() }, 3000) // build ahead of time so the first Home is instant
         handler.postDelayed(checkAfterWake, 2000) // (re)started while Amazon's home is showing? cover it
     }
 
@@ -130,6 +138,10 @@ class HomeRedirectService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (OriginalHomeMode.isActive(this)) {
+            pauseRedirect()
+            return
+        }
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
             event.className?.toString() == CustomizeActivity::class.java.name) {
@@ -162,7 +174,7 @@ class HomeRedirectService : AccessibilityService() {
 
     /** Cover Amazon's home with the overlay right away and bring up the launcher activity. */
     private fun redirect() {
-        if (dreaming || !powerManager.isInteractive) return // never cover the screensaver or a dark screen
+        if (OriginalHomeMode.isActive(this) || dreaming || !powerManager.isInteractive) return // never cover the screensaver or a dark screen
         showOverlay()
         val now = SystemClock.uptimeMillis()
         if (now - lastRedirect < 700) return
@@ -171,6 +183,17 @@ class HomeRedirectService : AccessibilityService() {
         goHome(this)
         handler.removeCallbacks(verify)
         handler.postDelayed(verify, RETRY_MS)
+    }
+
+    /** Cancel every delayed path that could pull the user back from Amazon's home. */
+    private fun pauseRedirect() {
+        amazonHomeInFront = false
+        retries = 0
+        pendingInputsClickUntil = 0
+        handler.removeCallbacks(verify)
+        handler.removeCallbacks(checkAfterWake)
+        handler.removeCallbacks(homeWhileAsleep)
+        hideOverlay()
     }
 
     /** Called by the activity once it's in front: take over the overlay's exact state, then drop it. */
@@ -194,7 +217,7 @@ class HomeRedirectService : AccessibilityService() {
     }
 
     private fun showOverlay() {
-        if (overlayShown || MainActivity.visible) return
+        if (OriginalHomeMode.isActive(this) || overlayShown || MainActivity.visible) return
         val view = overlayView()
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -228,6 +251,7 @@ class HomeRedirectService : AccessibilityService() {
     }
 
     private fun clickInputsTile(attempt: Int) {
+        if (OriginalHomeMode.isActive(this)) return
         var node: AccessibilityNodeInfo? =
             rootInActiveWindow?.findAccessibilityNodeInfosByText("Inputs")?.firstOrNull()
         while (node != null && !node.isClickable) node = node.parent
@@ -256,10 +280,41 @@ class HomeRedirectService : AccessibilityService() {
         var pendingInputsClickUntil = 0L
 
         fun goHome(context: Context) {
+            if (OriginalHomeMode.isActive(context)) return
             val intent = Intent(context, MainActivity::class.java)
+                .putExtra(OriginalHomeMode.AUTOMATIC_LAUNCH, true)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
             val options = ActivityOptions.makeCustomAnimation(context, R.anim.none, R.anim.none)
             context.startActivity(intent, options.toBundle())
+        }
+
+        /** Show Amazon's real home until the user explicitly opens this launcher again. */
+        fun openOriginalHome(context: Context): Boolean {
+            val wasActive = OriginalHomeMode.isActive(context)
+            if (!OriginalHomeMode.setActive(context, true)) {
+                Toast.makeText(context, "Die Home-Auswahl konnte nicht gespeichert werden.", Toast.LENGTH_LONG).show()
+                return false
+            }
+            instance?.pauseRedirect()
+            val pm = context.packageManager
+            val candidates = listOfNotNull(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(AMAZON_LAUNCHER),
+                runCatching { pm.getLeanbackLaunchIntentForPackage(AMAZON_LAUNCHER) }.getOrNull(),
+                runCatching { pm.getLaunchIntentForPackage(AMAZON_LAUNCHER) }.getOrNull(),
+                Intent().setClassName(AMAZON_LAUNCHER, AMAZON_HOME_PREFIX),
+            )
+            for (intent in candidates) {
+                try {
+                    context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED))
+                    return true
+                } catch (_: Exception) {
+                    // Fire OS versions expose different launch activities; try the next supported entry.
+                }
+            }
+            OriginalHomeMode.setActive(context, wasActive)
+            Toast.makeText(context, "Die Fire-TV-Startseite konnte nicht geöffnet werden.", Toast.LENGTH_LONG).show()
+            return false
         }
 
         fun amazonSettingsIntent(): Intent = Intent("amazon.intent.action.MAINSETTINGS")

@@ -14,6 +14,10 @@ class MainActivity : Activity(), HomeView.Host {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!acceptLaunch(intent, savedInstanceState != null)) {
+            finish()
+            return
+        }
         Apps.watch(this)
         home = HomeView(this, this)
         setContentView(home)
@@ -21,6 +25,11 @@ class MainActivity : Activity(), HomeView.Host {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
+        if (!acceptLaunch(intent, restoredActivity = false)) {
+            finish()
+            return
+        }
         // Home pressed while already home → back to the dock, like tvOS.
         // (Coming back from an app arrives here too, but then we keep the launched tile focused.)
         if (isResumedNow) home.goToTop()
@@ -28,6 +37,11 @@ class MainActivity : Activity(), HomeView.Host {
 
     override fun onResume() {
         super.onResume()
+        // A service launch already queued by Android may arrive after choosing Fire TV.
+        if (OriginalHomeMode.isActive(this)) {
+            finish()
+            return
+        }
         isResumedNow = true
         visible = true
         // If the instant overlay was covering for us, take over exactly where it was, then drop it.
@@ -38,7 +52,16 @@ class MainActivity : Activity(), HomeView.Host {
         super.onPause()
         isResumedNow = false
         visible = false
-        lastFocusedPkg = home.focusedPkg
+        if (::home.isInitialized) lastFocusedPkg = home.focusedPkg
+    }
+
+    private fun acceptLaunch(launch: Intent, restoredActivity: Boolean): Boolean {
+        val automatic = launch.getBooleanExtra(OriginalHomeMode.AUTOMATIC_LAUNCH, false)
+        if (!HomeLaunchPolicy.shouldOpen(OriginalHomeMode.isActive(this), automatic)) return false
+        if (HomeLaunchPolicy.shouldResume(automatic, restoredActivity) && OriginalHomeMode.isActive(this)) {
+            return OriginalHomeMode.setActive(this, false)
+        }
+        return true
     }
 
     override fun launch(app: AppEntry, from: View) {

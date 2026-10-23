@@ -8,4 +8,17 @@
     <string name="move_right">Nach rechts verschieben</string>
     <string name="back_to_order">Zurück zur Reihenfolge</string>
     <string name="done">Fertig</string>
+    <string name="fire_tv">Fire TV</string>
+    <string name="inputs">Eingänge</string>
+    <string name="settings">Einstellungen</string>
+    <string name="customize">Anpassen</string>
+    <string name="all_apps">Alle Apps</string>
+    <string name="quick_access">Deine Apps</string>
+    <string name="open_app_hint">OK drücken zum Öffnen</string>
+    <string name="fire_tv_hint">Amazon-Startseite öffnen · Home-Umleitung pausieren</string>
+    <string name="open_settings_hint">OK drücken zum Öffnen der Einstellungen</string>
+    <string name="customize_hint">Schnellzugriffe auswählen und anordnen</string>
+    <string name="good_morning">Guten Morgen</string>
+    <string name="good_afternoon">Guten Tag</string>
+    <string name="good_evening">Guten Abend</string>
 </resources>
