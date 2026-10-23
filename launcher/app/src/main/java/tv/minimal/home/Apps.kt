@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.drawable.Drawable
 import android.os.Handler
+import org.json.JSONArray
 import android.os.Looper
 
 class AppEntry(
@@ -59,6 +60,18 @@ object Apps {
     /** The installed apps, loaded once and shared by every home screen in this process. */
     fun catalog(context: Context): Catalog = cached ?: load(context.applicationContext).also { cached = it }
 
+    fun setFavorites(context: Context, packages: List<String>) {
+        context.getSharedPreferences("home", Context.MODE_PRIVATE).edit()
+            .putString("favorites", JSONArray(packages.distinct()).toString()).apply()
+        invalidate()
+    }
+
+    private fun invalidate() {
+        cached = null
+        version++
+        listeners.toList().forEach { it() }
+    }
+
     fun addListener(l: () -> Unit) = listeners.add(l)
     fun removeListener(l: () -> Unit) = listeners.remove(l)
 
@@ -67,11 +80,7 @@ object Apps {
         if (watching) return
         watching = true
         val handler = Handler(Looper.getMainLooper())
-        val invalidate = Runnable {
-            cached = null
-            version++
-            listeners.toList().forEach { it() }
-        }
+        val invalidate = Runnable { invalidate() }
         context.applicationContext.registerReceiver(object : BroadcastReceiver() {
             override fun onReceive(c: Context, intent: Intent) {
                 handler.removeCallbacks(invalidate)
@@ -109,10 +118,19 @@ object Apps {
             }
         }
 
-        val favorites = FAVORITES.mapNotNull { group ->
-            val hit = group.firstNotNullOfOrNull { found[it] }
-            group.forEach { found.remove(it) } // also hides duplicate alternatives
-            hit
+        val stored = context.getSharedPreferences("home", Context.MODE_PRIVATE)
+            .getString("favorites", null)
+        val selected = stored?.let { value ->
+            runCatching {
+                val array = JSONArray(value)
+                List(array.length()) { array.getString(it) }
+            }.getOrNull()
+        }
+        val packages = FavoriteOrder.resolve(selected, FAVORITES, found.keys)
+        val favorites = packages.mapNotNull { found.remove(it) }
+        if (selected == null) {
+            // Keep alternate versions of the default apps out of the remaining grid.
+            FAVORITES.flatten().forEach { found.remove(it) }
         }
         val others = found.values.sortedBy { it.label.lowercase() }
         return Catalog(favorites, others)

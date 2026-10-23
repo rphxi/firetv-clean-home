@@ -48,6 +48,7 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
     private lateinit var greeting: TextView
     private lateinit var inputs: Pill
     private lateinit var settings: Pill
+    private lateinit var customize: Pill
     private val caption: TextView
     private lateinit var dock: FrameLayout
     private lateinit var dockFrame: GlideFrame
@@ -167,6 +168,7 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
         val target: View? = when {
             otherFocus === other.inputs -> inputs
             otherFocus === other.settings -> settings
+            otherFocus === other.customize -> customize
             else -> other.focusedPkg?.let { p -> allTiles().firstOrNull { it.app.pkg == p } } ?: firstTile
         }
         target?.requestFocus()
@@ -254,9 +256,15 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
         settings = Pill(context, R.drawable.ic_settings, "Settings").apply {
             setOnClickListener { host.open(HomeRedirectService.amazonSettingsIntent()) }
         }
+        customize = Pill(context, R.drawable.ic_settings, "Anpassen").apply {
+            setOnClickListener { host.open(Intent(context, CustomizeActivity::class.java)) }
+        }
         val right = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             clipChildren = false
+            addView(customize, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+                marginEnd = context.dpi(10)
+            })
             addView(inputs)
             addView(settings, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
                 marginStart = context.dpi(10)
@@ -381,6 +389,7 @@ class HomeView(context: Context, private val host: Host) : FrameLayout(context) 
         allTiles().forEach { it.settle() }
         inputs.settle()
         settings.settle()
+        customize.settle()
     }
 
     private fun onFocusMoved(now: View?) {

@@ -131,6 +131,12 @@ class HomeRedirectService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val pkg = event.packageName?.toString() ?: return
+        if (pkg == packageName && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            event.className?.toString() == CustomizeActivity::class.java.name) {
+            amazonHomeInFront = false
+            handler.removeCallbacks(verify)
+            hideOverlay()
+        }
         if (pkg == packageName || pkg == SYSTEM_UI) return // our own windows, volume bar etc.
 
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {

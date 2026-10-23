@@ -96,7 +96,14 @@ to third-party accessibility services. So:
   leave the TV needing a factory reset.
 
 ## Customising
-- **Dock apps and order**: `FAVORITES` in `launcher/app/src/main/java/tv/minimal/home/Apps.kt`.
+- **Quick access apps**: choose **Anpassen → Schnellzugriffe auswählen** on the launcher,
+  tick the installed apps you want and choose **Speichern**. Untick an app to remove it from
+  the dock; this does not uninstall it. Existing favorites keep their order; new selections
+  are appended. The selection survives app and device restarts, including an intentionally empty dock.
+- **Home button**: **Anpassen → Home-Taste einrichten** opens accessibility settings.
+  Enable **Home button redirect**. If Fire OS does not expose the service there, ADB setup
+  may be needed. Fire OS 8 compatibility must be tested on the device; keep Amazon's launcher installed.
+- **Default dock apps**: `FAVORITES` in `launcher/app/src/main/java/tv/minimal/home/Apps.kt` (used before the first custom selection).
 - **Your own wallpapers** (override Bing): landscape jpg/png/webp, ideally 1920×1080:
   ```bash
   adb push ~/Pictures/tv-wallpapers/. /sdcard/Android/data/tv.minimal.home/files/wallpapers/
