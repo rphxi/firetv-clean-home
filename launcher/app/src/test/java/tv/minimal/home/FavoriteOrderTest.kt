@@ -21,4 +21,28 @@ class FavoriteOrderTest {
         assertEquals(emptyList<String>(),
             FavoriteOrder.resolve(emptyList(), defaults, setOf("netflix", "prime")))
     }
+
+    @Test fun moveLeftAndRightPreservesOtherAppsAndOriginalList() {
+        val original = listOf("netflix", "youtube", "extra", "prime")
+        assertEquals(listOf("netflix", "extra", "youtube", "prime"),
+            FavoriteOrder.move(original, 2, -1))
+        assertEquals(listOf("netflix", "extra", "youtube", "prime"),
+            FavoriteOrder.move(original, 1, 1))
+        assertEquals(listOf("netflix", "youtube", "extra", "prime"), original)
+    }
+
+    @Test fun movesDoNotWrapOrUseInvalidPositions() {
+        val apps = listOf("netflix", "extra")
+        assertEquals(apps, FavoriteOrder.move(apps, 0, -1))
+        assertEquals(apps, FavoriteOrder.move(apps, 1, 1))
+        assertEquals(apps, FavoriteOrder.move(apps, -1, 1))
+        assertEquals(apps, FavoriteOrder.move(apps, 0, 2))
+        assertEquals(emptyList<String>(), FavoriteOrder.move(emptyList(), 0, 1))
+    }
+
+    @Test fun savedOrderSurvivesCatalogReload() {
+        val moved = FavoriteOrder.move(listOf("netflix", "extra", "prime"), 1, -1)
+        assertEquals(listOf("extra", "netflix", "prime"),
+            FavoriteOrder.resolve(moved, defaults, setOf("netflix", "extra", "prime")))
+    }
 }

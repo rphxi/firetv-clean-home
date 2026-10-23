@@ -33,11 +33,15 @@ class CustomizeActivity : Activity() {
             setOnClickListener { chooseFavorites() }
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         column.addView(Button(this).apply {
+            setText(R.string.reorder_favorites)
+            setOnClickListener { reorderFavorites() }
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        column.addView(Button(this).apply {
             text = "Home-Taste einrichten"
             setOnClickListener {
                 AlertDialog.Builder(this@CustomizeActivity)
                     .setTitle("Home-Taste")
-                    .setMessage("Aktiviere in den Bedienungshilfen den Dienst »Home button redirect«. Amazons Launcher bleibt installiert. Ob Fire OS 8 die Umleitung zulässt, muss auf deinem Gerät geprüft werden.")
+                    .setMessage("Aktiviere in den Bedienungshilfen den Dienst »Home button redirect«. Wird der Dienst nicht angezeigt, kann er über ADB eingerichtet werden. Amazons Launcher bleibt installiert. Ob Fire OS 8 die Umleitung zulässt, muss auf deinem Gerät geprüft werden.")
                     .setPositiveButton("Bedienungshilfen öffnen") { _, _ ->
                         try {
                             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -62,6 +66,41 @@ class CustomizeActivity : Activity() {
         super.onResume()
         status.text = if (HomeRedirectService.instance != null) "Home-Umleitung: Dienst verbunden"
             else "Home-Umleitung: Dienst noch nicht verbunden"
+    }
+
+    private fun reorderFavorites(focusIndex: Int = 0) {
+        val favorites = Apps.catalog(this).favorites
+        if (favorites.size < 2) {
+            Toast.makeText(this, R.string.reorder_needs_apps, Toast.LENGTH_LONG).show()
+            return
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.reorder_favorites)
+            .setItems(favorites.map { it.label }.toTypedArray()) { _, index ->
+                val offsets = buildList {
+                    if (index > 0) add(-1)
+                    if (index < favorites.lastIndex) add(1)
+                }
+                AlertDialog.Builder(this)
+                    .setTitle(favorites[index].label)
+                    .setItems(offsets.map {
+                        getString(if (it < 0) R.string.move_left else R.string.move_right)
+                    }.toTypedArray()) { _, action ->
+                        val offset = offsets[action]
+                        Apps.setFavorites(this, FavoriteOrder.move(
+                            favorites.map { it.pkg }, index, offset))
+                        reorderFavorites(index + offset)
+                    }
+                    .setNegativeButton(R.string.back_to_order) { _, _ -> reorderFavorites(index) }
+                    .setOnCancelListener { reorderFavorites(index) }
+                    .show()
+            }
+            .setPositiveButton(R.string.done, null)
+            .create()
+        dialog.show()
+        // Stay on the moved tile so repeated moves only need the remote's Select button.
+        dialog.listView.setSelection(focusIndex.coerceIn(favorites.indices))
+        dialog.listView.requestFocus()
     }
 
     private fun chooseFavorites() {

@@ -99,7 +99,9 @@ to third-party accessibility services. So:
 - **Quick access apps**: choose **Anpassen → Schnellzugriffe auswählen** on the launcher,
   tick the installed apps you want and choose **Speichern**. Untick an app to remove it from
   the dock; this does not uninstall it. Existing favorites keep their order; new selections
-  are appended. The selection survives app and device restarts, including an intentionally empty dock.
+  are appended. Use **Anpassen → Schnellzugriffe verschieben**, select an app and choose
+  **Nach links verschieben** or **Nach rechts verschieben** to reorder the dock. Each move is saved
+  immediately. The selection survives app and device restarts, including an intentionally empty dock.
 - **Home button**: **Anpassen → Home-Taste einrichten** opens accessibility settings.
   Enable **Home button redirect**. If Fire OS does not expose the service there, ADB setup
   may be needed. Fire OS 8 compatibility must be tested on the device; keep Amazon's launcher installed.

@@ -2,4 +2,10 @@
     <string name="app_name">Home</string>
     <string name="redirect_label">Home button redirect</string>
     <string name="redirect_description">Opens your Home launcher whenever the Amazon home screen appears.</string>
+    <string name="reorder_favorites">Schnellzugriffe verschieben</string>
+    <string name="reorder_needs_apps">Wähle zuerst mindestens zwei Schnellzugriffe aus.</string>
+    <string name="move_left">Nach links verschieben</string>
+    <string name="move_right">Nach rechts verschieben</string>
+    <string name="back_to_order">Zurück zur Reihenfolge</string>
+    <string name="done">Fertig</string>
 </resources>
